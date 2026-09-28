@@ -1,0 +1,74 @@
+[
+  {
+    "name": "Sri Lakshmi Kirana",
+    "area": "Dilsukhnagar",
+    "due": 65000,
+    "personality": "Frequently breaks promises on initial deadlines, but clears dues when offered a 2-part split. Only answers calls after 7 PM once the evening customer rush subsides."
+  },
+  {
+    "name": "Balaji General Stores",
+    "area": "Kothapet",
+    "due": 45000,
+    "personality": "Strictly pays on the 5th of every month without fail; gets very annoyed and defensive if chased earlier. Best to send a courteous WhatsApp reminder on the 4th."
+  },
+  {
+    "name": "Venkateshwara Supermarket",
+    "area": "LB Nagar",
+    "due": 85000,
+    "personality": "High-turnover store that delays payment citing slow distributor dispatch or damaged stock. Clears immediately via UPI when the sales rep visits in person during the afternoon lull (2 PM to 4 PM)."
+  },
+  {
+    "name": "Sai Ram Traders",
+    "area": "Chaitanyapuri",
+    "due": 52000,
+    "personality": "Habitually requests a 7-day credit extension. Honors commitments only when firmly reminded that pending orders of high-demand staples like edible oils will be held. Prefers phone calls around 11 AM."
+  },
+  {
+    "name": "New Bharat Provision Store",
+    "area": "Malakpet",
+    "due": 38000,
+    "personality": "Good-natured shopkeeper who genuinely forgets verbal commitments amidst store bustle. Readily settles via Google Pay when an itemized statement is shared over WhatsApp before 1 PM."
+  },
+  {
+    "name": "Raghavendra Kirana & General",
+    "area": "Nagole",
+    "due": 70000,
+    "personality": "Chronic promise breaker; frequently claims bank server issues or cheque book unavailability. Responds only to a firm 48-hour final notice or when the owner's son is contacted directly in the morning (9 AM to 10 AM)."
+  },
+  {
+    "name": "Gayatri Enterprises",
+    "area": "Saroornagar",
+    "due": 42000,
+    "personality": "Risk-averse with tight cash flow management. Never pays the full balance in one lump sum; pays smoothly in weekly installments of Rs 10,000 to Rs 15,000. Receptive on Tuesdays and Fridays around 5 PM."
+  },
+  {
+    "name": "Shiva Sai Departmental Store",
+    "area": "Karmanghat",
+    "due": 58000,
+    "personality": "Prompt payer if provided a nominal 1.5% prompt-payment cash discount or bonus scheme. Disregards generic payment nudges without financial incentive. Best reached on weekday mornings at 10 AM."
+  },
+  {
+    "name": "Maruthi Kirana Merchant",
+    "area": "Vanasthalipuram",
+    "due": 34000,
+    "personality": "Elderly, traditional owner who refuses UPI or online bank transfers. Pays strictly in physical cash upon hand delivery of receipt by field staff on weekend mornings between 8 AM and 10 AM."
+  },
+  {
+    "name": "Sri Krishna Daily Needs",
+    "area": "Gaddiannaram",
+    "due": 48000,
+    "personality": "Reliable and financially sound, but completely ignores phone calls while managing counter sales. Highly responsive to concise WhatsApp text messages sent between 3 PM and 5 PM, settling via NEFT within hours."
+  },
+  {
+    "name": "Durga Bhavani Super Bazaar",
+    "area": "Hastinapuram",
+    "due": 55000,
+    "personality": "Thorough and argumentative customer who disputes invoice calculations to stall payment. Clears payment by cheque within 24 hours once provided a signed physical delivery challan and ledger statement."
+  },
+  {
+    "name": "Annapurna Stores",
+    "area": "Dilsukhnagar",
+    "due": 28000,
+    "personality": "Small neighborhood store operating on tight margins. Very cooperative when treated with patience and empathy; clears dues in daily micro-transfers of Rs 5,000 to Rs 7,000 via UPI. Best messaged around 8 PM."
+  }
+]
