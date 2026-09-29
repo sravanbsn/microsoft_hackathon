@@ -11,6 +11,7 @@ load_dotenv()
 # Groq client — lazily initialized so missing keys don't crash at import time
 # ---------------------------------------------------------------------------
 _groq: Groq | None = None
+_current_groq_key: str | None = None
 
 _PRIMARY_MODEL = "openai/gpt-oss-120b"
 _FALLBACK_MODEL = "qwen/qwen3.8-27b"
@@ -23,16 +24,46 @@ def _load_shops() -> list[dict]:
         return json.load(f)
 
 
+def _get_api_key() -> str:
+    """Retrieve and sanitize Groq API key from Streamlit secrets, session state, or environment."""
+    key = None
+    try:
+        import streamlit as st
+        # 1. UI session state override
+        if hasattr(st, "session_state") and st.session_state.get("groq_api_key"):
+            key = st.session_state["groq_api_key"]
+        # 2. Streamlit Cloud secrets
+        elif hasattr(st, "secrets"):
+            if "GROQ_API_KEY" in st.secrets:
+                key = st.secrets["GROQ_API_KEY"]
+            elif "groq" in st.secrets and isinstance(st.secrets["groq"], dict):
+                key = st.secrets["groq"].get("api_key")
+    except Exception:
+        pass
+
+    # 3. Environment variable fallback
+    if not key:
+        key = os.getenv("GROQ_API_KEY")
+
+    if key:
+        # Strip whitespace, newlines, and accidental quotes (single/double)
+        key = str(key).strip().strip('"').strip("'")
+
+    return key or ""
+
+
 def _get_groq() -> Groq:
-    """Return the shared Groq client, creating it on first call."""
-    global _groq
-    if _groq is None:
-        api_key = os.getenv("GROQ_API_KEY")
-        if not api_key:
-            raise EnvironmentError(
-                "GROQ_API_KEY is not set. Add it to your .env file or environment."
-            )
+    """Return the shared Groq client, creating or updating it when the key changes."""
+    global _groq, _current_groq_key
+    api_key = _get_api_key()
+    if not api_key:
+        raise EnvironmentError(
+            "GROQ_API_KEY is not set or is empty. "
+            "Add it to your Streamlit Cloud Secrets (Settings > Secrets) or provide it in the sidebar."
+        )
+    if _groq is None or _current_groq_key != api_key:
         _groq = Groq(api_key=api_key)
+        _current_groq_key = api_key
     return _groq
 
 
@@ -52,16 +83,23 @@ def _chat_with_fallback(messages: list[dict]) -> tuple[str, str]:
     Try PRIMARY_MODEL first; on any error fall back to FALLBACK_MODEL.
     Returns (text, model_used).
     """
+    last_exc = None
     for model in (_PRIMARY_MODEL, _FALLBACK_MODEL):
         try:
             text = _chat(messages, model)
             return text, model
         except Exception as exc:
+            last_exc = exc
+            # If the API key is unauthorized or invalid, do not retry on fallback model
+            if "AuthenticationError" in type(exc).__name__:
+                raise exc
             if model == _FALLBACK_MODEL:
                 raise
             print(f"[agent] Primary model failed ({exc}); falling back to {_FALLBACK_MODEL}")
-    # unreachable but satisfies type checker
+    if last_exc:
+        raise last_exc
     raise RuntimeError("Both models failed")
+
 
 
 # ---------------------------------------------------------------------------

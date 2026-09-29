@@ -6,6 +6,30 @@ from pathlib import Path
 
 import streamlit as st
 
+# ──────────────────────────────────────────────────────────────────────────────
+# Streamlit Cloud Secret Synchronization
+# ──────────────────────────────────────────────────────────────────────────────
+def _sync_secrets_to_env():
+    """Ensure secrets configured in Streamlit Cloud (st.secrets) are synced into os.environ."""
+    try:
+        if hasattr(st, "secrets"):
+            for key, val in st.secrets.items():
+                if isinstance(val, str):
+                    clean_val = val.strip().strip('"').strip("'")
+                    os.environ[key] = clean_val
+                elif isinstance(val, dict):
+                    for sub_k, sub_v in val.items():
+                        if isinstance(sub_v, str):
+                            clean_v = sub_v.strip().strip('"').strip("'")
+                            os.environ[sub_k] = clean_v
+                            # Map sections like [groq] api_key -> GROQ_API_KEY
+                            if sub_k.lower() == "api_key" and key.upper() in ("GROQ", "HINDSIGHT"):
+                                os.environ[f"{key.upper()}_API_KEY"] = clean_v
+    except Exception:
+        pass
+
+_sync_secrets_to_env()
+
 # Ensure the promiseledger package directory is importable
 ROOT = Path(__file__).resolve().parent
 if str(ROOT) not in sys.path:
@@ -294,12 +318,75 @@ if "selected_shop" not in st.session_state:
     st.session_state.selected_shop = None
 if "draft_result" not in st.session_state:
     st.session_state.draft_result = None
+if "draft_error" not in st.session_state:
+    st.session_state.draft_error = None
+if "groq_api_key" not in st.session_state:
+    st.session_state.groq_api_key = os.getenv("GROQ_API_KEY", "")
 if "use_memory" not in st.session_state:
     st.session_state.use_memory = True
 if "outcome_log" not in st.session_state:
     st.session_state.outcome_log = {}
 if "chase_loaded" not in st.session_state:
     st.session_state.chase_loaded = False
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Sidebar: System configuration and key management
+# ──────────────────────────────────────────────────────────────────────────────
+with st.sidebar:
+    st.markdown("### ⚙️ System Configuration")
+
+    has_groq = bool(
+        st.session_state.get("groq_api_key")
+        or os.getenv("GROQ_API_KEY")
+        or (hasattr(st, "secrets") and "GROQ_API_KEY" in st.secrets)
+    )
+    has_hindsight = bool(
+        os.getenv("HINDSIGHT_API_KEY")
+        or (hasattr(st, "secrets") and "HINDSIGHT_API_KEY" in st.secrets)
+    )
+
+    if has_groq:
+        st.success("Groq API: Connected ✅")
+    else:
+        st.warning("Groq API: Key Missing ⚠️")
+
+    if has_hindsight:
+        st.info("Hindsight: Connected 🧠")
+    else:
+        st.caption("Hindsight: Running in local fallback mode")
+
+    st.markdown("---")
+    st.markdown("#### 🔑 Groq API Key")
+    input_key = st.text_input(
+        "Groq API Key",
+        value=st.session_state.groq_api_key,
+        type="password",
+        placeholder="gsk_...",
+        help="Supply or update your Groq API key directly if not configured in Streamlit Cloud Secrets.",
+    )
+    if input_key != st.session_state.groq_api_key:
+        cleaned_key = input_key.strip().strip('"').strip("'")
+        st.session_state.groq_api_key = cleaned_key
+        os.environ["GROQ_API_KEY"] = cleaned_key
+        st.session_state.draft_result = None
+        st.session_state.draft_error = None
+        st.rerun()
+
+    with st.expander("☁️ Streamlit Cloud Secrets Guide"):
+        st.markdown(
+            """
+            **To configure permanently on Streamlit Cloud:**
+            1. Click **Manage app** (bottom-right).
+            2. Click **⋮** ➔ **Settings** ➔ **Secrets**.
+            3. Paste:
+            ```toml
+            GROQ_API_KEY = "gsk_your_groq_api_key_here"
+            HINDSIGHT_API_KEY = "hsk_your_hindsight_key_here"
+            HINDSIGHT_API_URL = "https://api.hindsight.vectorize.io"
+            ```
+            4. Click **Save** — keys will be auto-synchronized.
+            """
+        )
 
 # ──────────────────────────────────────────────────────────────────────────────
 # App header
@@ -329,6 +416,7 @@ def load_chase():
         if st.session_state.chase and st.session_state.selected_shop is None:
             st.session_state.selected_shop = st.session_state.chase[0]
             st.session_state.draft_result = None
+            st.session_state.draft_error = None
 
 
 if not st.session_state.chase_loaded:
@@ -341,13 +429,32 @@ def generate_draft():
     shop = resolve_shop(st.session_state.selected_shop)
     if not shop:
         return
+    st.session_state.draft_error = None
     with st.spinner(f"Drafting follow-up for {shop['name']}…"):
-        st.session_state.draft_result = draft_followup(
-            shop=shop["name"],
-            due=shop["due"],
-            area=shop.get("area", ""),
-            use_memory=st.session_state.use_memory,
-        )
+        try:
+            st.session_state.draft_result = draft_followup(
+                shop=shop["name"],
+                due=shop["due"],
+                area=shop.get("area", ""),
+                use_memory=st.session_state.use_memory,
+            )
+        except Exception as exc:
+            st.session_state.draft_result = None
+            err_name = type(exc).__name__
+            err_msg = str(exc)
+            if "AuthenticationError" in err_name or "401" in err_msg or "unauthorized" in err_msg.lower():
+                st.session_state.draft_error = (
+                    "Groq Authentication Error: The Groq API key is invalid, missing, or improperly formatted. "
+                    "Ensure your key starts with `gsk_` and contains no accidental quotes or whitespace. "
+                    "Update it in the left sidebar or in Streamlit Cloud Secrets."
+                )
+            elif "EnvironmentError" in err_name:
+                st.session_state.draft_error = (
+                    f"{err_msg} You can paste your GROQ_API_KEY directly in the sidebar on the left."
+                )
+            else:
+                st.session_state.draft_error = f"Error generating draft: {err_msg}"
+
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -417,6 +524,7 @@ with col_left:
     if mem_on != st.session_state.use_memory:
         st.session_state.use_memory = mem_on
         st.session_state.draft_result = None   # invalidate cached draft
+        st.session_state.draft_error = None
 
     st.markdown("<div style='margin-bottom:10px'></div>", unsafe_allow_html=True)
 
@@ -425,6 +533,7 @@ with col_left:
         st.session_state.chase_loaded = False
         st.session_state.selected_shop = None
         st.session_state.draft_result = None
+        st.session_state.draft_error = None
         load_chase()
         st.rerun()
 
@@ -456,6 +565,7 @@ with col_left:
         if st.button(f"Select", key=f"sel_{idx}", use_container_width=True):
             st.session_state.selected_shop = shop
             st.session_state.draft_result = None
+            st.session_state.draft_error = None
             st.rerun()
 
     st.markdown("</div>", unsafe_allow_html=True)
@@ -501,12 +611,24 @@ with col_center:
             unsafe_allow_html=True,
         )
 
-        # Auto-generate on first selection
-        if st.session_state.draft_result is None:
+        # Auto-generate on first selection if no draft or previous error
+        if st.session_state.draft_result is None and st.session_state.draft_error is None:
             generate_draft()
 
         draft_res = st.session_state.draft_result
-        if draft_res:
+        if st.session_state.draft_error:
+            st.error(st.session_state.draft_error)
+            st.markdown(
+                """
+                <div style="background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.25); border-radius: 8px; padding: 12px; margin: 10px 0; font-size: 0.85rem; color: #fca5a5;">
+                    <b>💡 Quick Fix:</b><br/>
+                    • Expand the left sidebar (<b>⚙️ System Configuration</b>) and enter your valid <code>GROQ_API_KEY</code>.<br/>
+                    • Or in Streamlit Cloud, go to <b>Manage app ➔ Settings ➔ Secrets</b> and set <code>GROQ_API_KEY = "gsk_..."</code>.
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+        elif draft_res:
             st.markdown(
                 f'<div class="draft-box">{draft_res["draft"]}</div>',
                 unsafe_allow_html=True,
@@ -529,6 +651,7 @@ with col_center:
         with btn_col1:
             if st.button("✍️ Draft again", key="btn_redraft", use_container_width=True):
                 st.session_state.draft_result = None
+                st.session_state.draft_error = None
                 generate_draft()
                 st.rerun()
 
